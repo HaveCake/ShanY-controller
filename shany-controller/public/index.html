@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShanY 手柄控制工具</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div class="main-layout">
+        <aside class="sidebar glass">
+            <!-- 侧边栏链接 -->
+            <div class="sidebar-links">
+                <a href="https://shany.cc/" target="_blank" class="sidebar-link">
+                    <i class="fas fa-globe"></i> 作者官网
+                </a>
+                <a href="https://blog.shany.cc/archives/shany-control" target="_blank" class="sidebar-link">
+                    <i class="fas fa-info-circle"></i> 关于工具
+                </a>
+            </div>
+
+            <h3><i class="fas fa-history"></i> 操作日志</h3>
+            <div id="log-box" class="log-content">
+                <div class="log-item">系统就绪...等待手柄连接</div>
+            </div>
+            
+            <!-- 房间关闭倒计时区域 -->
+            <div id="room-close-panel" class="room-close-panel hidden">
+                <div class="close-timer">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span id="close-countdown">10:00</span>
+                </div>
+                <div class="close-hint">房间即将关闭</div>
+                <button id="btn-keep-alive" class="btn-keep-alive">
+                    <i class="fas fa-sync-alt"></i> 保持开启
+                </button>
+            </div>
+        </aside>
+
+        <main class="content-area glass">
+            <header>
+                <h1 class="gradient-text">ShanY 手柄控制工具</h1>
+                <p class="subtitle">Web端 Xbox 手柄本地/远程震动控制终端</p>
+            </header>
+
+            <!-- 本地控制区块 -->
+            <section class="control-section local-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-gamepad"></i> 本地控制</h2>
+                    <div id="gamepad-status" class="status-box disconnected">
+                        <i class="fas fa-times-circle"></i>
+                        <span>未连接手柄</span>
+                    </div>
+                </div>
+                <div class="control-panel">
+                    <!-- 弹性开关 -->
+                    <div class="elastic-toggle-group">
+                        <span class="elastic-label">弹性控制模式</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="local-elastic-mode">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="elastic-hint">开启后松开滑块自动回弹</span>
+                    </div>
+
+                    <!-- 左右马达分别控制 -->
+                    <div class="motor-sliders">
+                        <div class="slider-group">
+                            <div class="slider-label-group">
+                                <label>左马达震动</label>
+                                <span class="slider-value" id="local-left-value">0%</span>
+                            </div>
+                            <input type="range" id="local-left" min="0" max="100" value="0">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label-group">
+                                <label>右马达震动</label>
+                                <span class="slider-value" id="local-right-value">0%</span>
+                            </div>
+                            <input type="range" id="local-right" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="btn-max-vibrate" class="btn-primary">一键最大震动</button>
+                        <button id="btn-stop-vibrate" class="btn-secondary">一键关闭震动</button>
+                    </div>
+                    
+                    <p class="hint-text">* 请按下手柄任意按键以激活连接</p>
+                    <p class="hint-text hint-warning">
+                        <i class="fas fa-info-circle"></i> 
+                        手机浏览器无法使蓝牙连接的手柄震动，请使用电脑浏览器。
+                        索尼手柄可通过软件转换为Xbox手柄实现震动控制。
+                    </p>
+                </div>
+            </section>
+
+            <hr class="divider">
+
+            <!-- 远程控制区块 -->
+            <section class="control-section remote-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-network-wired"></i> 远程控制</h2>
+                    <div id="room-status" class="status-box disconnected">
+                        <i class="fas fa-times-circle"></i>
+                        <span>未加入房间</span>
+                    </div>
+                </div>
+                
+                <!-- 房间功能区域 -->
+                <div id="room-functions" class="room-functions">
+                    <!-- 展开/收起按钮 -->
+                    <button id="btn-toggle-room" class="btn-toggle-room">
+                        <i class="fas fa-chevron-up"></i>
+                        <span>收起房间功能</span>
+                    </button>
+                    
+                    <div id="room-content" class="room-content">
+                        <div class="remote-grid">
+                            <div class="room-action glass-inner">
+                                <h3>创建房间</h3>
+                                <input type="text" id="create-name" placeholder="房间名">
+                                <input type="password" id="create-pass" placeholder="密码 (可选)">
+                                <div class="toggle-group">
+                                    <span class="toggle-label">公开房间</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="create-public" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <button id="btn-create" class="btn-action">创建</button>
+                                <p class="tiny-hint">注: 房间只剩1人时10分钟后自动关闭</p>
+                            </div>
+
+                            <div class="room-action glass-inner">
+                                <h3>加入房间</h3>
+                                <input type="text" id="join-name" placeholder="点击列表自动填入">
+                                <input type="password" id="join-pass" placeholder="输入密码">
+                                <button id="btn-join" class="btn-action">加入</button>
+                            </div>
+                        </div>
+
+                        <div class="room-list-container">
+                            <h3>在线房间列表</h3>
+                            <div id="room-list" class="room-list">
+                                <div class="empty-list">暂无公开房间</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="remote-controller" class="remote-controller hidden">
+                    <h3><i class="fas fa-satellite-dish"></i> 控制对方手柄</h3>
+                    <div class="control-panel">
+                        <!-- 弹性开关 -->
+                        <div class="elastic-toggle-group">
+                            <span class="elastic-label">弹性控制模式</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="remote-elastic-mode">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="elastic-hint">开启后松开滑块自动回弹</span>
+                        </div>
+
+                        <!-- 左右马达分别控制 -->
+                        <div class="motor-sliders">
+                            <div class="slider-group">
+                                <div class="slider-label-group">
+                                    <label>左马达震动</label>
+                                    <span class="slider-value" id="remote-left-value">0%</span>
+                                </div>
+                                <input type="range" id="remote-left" min="0" max="100" value="0">
+                            </div>
+                            <div class="slider-group">
+                                <div class="slider-label-group">
+                                    <label>右马达震动</label>
+                                    <span class="slider-value" id="remote-right-value">0%</span>
+                                </div>
+                                <input type="range" id="remote-right" min="0" max="100" value="0">
+                            </div>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button id="btn-remote-max" class="btn-primary">一键最大震动</button>
+                            <button id="btn-remote-stop" class="btn-secondary">一键关闭震动</button>
+                        </div>
+                        
+                        <p class="hint-text hint-warning">
+                            <i class="fas fa-info-circle"></i> 
+                            手机浏览器无法使蓝牙连接的手柄震动。索尼手柄转换为Xbox手柄后可实现震动控制。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <footer>
+                <div class="footer-content">
+                    <div class="footer-copyright">
+                        <span>版权所有 © 2026 ShanY.cc</span>
+                    </div>
+                    <div class="footer-links">
+                        <a href="https://shany.cc/" target="_blank">作者官网</a>
+                        <a href="https://blog.shany.cc/archives/shany-control" target="_blank">关于工具</a>
+                    </div>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <button id="theme-toggle" class="theme-btn glass">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <script src="script.js"></script>
+</body>
+</html>
