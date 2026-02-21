@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/25455013/README.md)
 # ShanY 手柄控制工具
 
 <p align="center">
