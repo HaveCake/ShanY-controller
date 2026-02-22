@@ -111,7 +111,7 @@ function triggerPhoneVibration(strong, weak) {
     if (navigator.vibrate) {
         const intensity = Math.max(strong, weak);
         if (intensity > 0) {
-            navigator.vibrate(200);
+            navigator.vibrate(Math.round(intensity * 200));
         }
     }
 }
