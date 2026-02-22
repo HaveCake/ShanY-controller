@@ -102,9 +102,9 @@ io.on('connection', (socket) => {
     });
 
     // 远程控制信号
-    socket.on('remoteVibrate', ({ roomName, strong, weak, leftMag, rightMag }) => {
+    socket.on('remoteVibrate', ({ roomName, strong, weak, leftMag, rightMag, phoneVibrate }) => {
         // 广播给房间内除了自己以外的人
-        socket.to(roomName).emit('triggerVibrate', { strong, weak, leftMag, rightMag });
+        socket.to(roomName).emit('triggerVibrate', { strong, weak, leftMag, rightMag, phoneVibrate });
     });
 
     // 断开连接
