@@ -4,6 +4,7 @@ let currentRoomName = null;
 let isHost = false;
 let localElasticMode = false;
 let remoteElasticMode = false;
+let phoneVibrateMode = false;
 
 // 震动循环相关
 let localVibrationInterval = null;
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener("gamepaddisconnected", handleDisconnect);
     initRoomClosePanel();
     initRoomToggle();
+    initVibrateTargetToggle();
     initLocalControl();
     initRemoteControl();
 });
@@ -86,6 +88,40 @@ function initRoomToggle() {
     });
 }
 
+// === 震动目标切换 ===
+function initVibrateTargetToggle() {
+    const toggle = document.getElementById('vibrate-target-mode');
+    const hint = document.getElementById('vibrate-target-hint');
+
+    toggle.addEventListener('change', (e) => {
+        phoneVibrateMode = e.target.checked;
+        hint.textContent = phoneVibrateMode ? '当前：手机震动' : '当前：手柄震动';
+        addLog(phoneVibrateMode ? '已切换为手机震动模式' : '已切换为手柄震动模式');
+
+        if (phoneVibrateMode) {
+            stopVibration();
+        } else {
+            stopPhoneVibration();
+        }
+    });
+}
+
+// === 手机震动 API ===
+function triggerPhoneVibration(strong, weak) {
+    if (navigator.vibrate) {
+        const intensity = Math.max(strong, weak);
+        if (intensity > 0) {
+            navigator.vibrate(Math.round(intensity * 200));
+        }
+    }
+}
+
+function stopPhoneVibration() {
+    if (navigator.vibrate) {
+        navigator.vibrate(0);
+    }
+}
+
 // === 房间关闭倒计时面板 ===
 function initRoomClosePanel() {
     const keepAliveBtn = document.getElementById('btn-keep-alive');
@@ -131,11 +167,13 @@ function initLocalControl() {
         if (localVibrationInterval) return;
         
         localVibrationInterval = setInterval(() => {
-            if (gamepadIndex !== null) {
-                const leftVal = currentLocalValues.left;
-                const rightVal = currentLocalValues.right;
-                
-                if (leftVal > 0 || rightVal > 0) {
+            const leftVal = currentLocalValues.left;
+            const rightVal = currentLocalValues.right;
+            
+            if (leftVal > 0 || rightVal > 0) {
+                if (phoneVibrateMode) {
+                    triggerPhoneVibration(leftVal, rightVal);
+                } else if (gamepadIndex !== null) {
                     triggerVibration(leftVal, rightVal);
                 }
             }
@@ -168,9 +206,13 @@ function initLocalControl() {
         const value = parseInt(leftSlider.value) / 100;
         currentLocalValues.left = value;
         
-        if (gamepadIndex !== null) {
+        if (phoneVibrateMode || gamepadIndex !== null) {
             // 立即触发震动
-            triggerVibration(currentLocalValues.left, currentLocalValues.right);
+            if (phoneVibrateMode) {
+                triggerPhoneVibration(currentLocalValues.left, currentLocalValues.right);
+            } else {
+                triggerVibration(currentLocalValues.left, currentLocalValues.right);
+            }
             
             // 如果不是持续震动模式，启动持续震动
             if (!localVibrationInterval && !localElasticMode) {
@@ -185,9 +227,13 @@ function initLocalControl() {
         const value = parseInt(rightSlider.value) / 100;
         currentLocalValues.right = value;
         
-        if (gamepadIndex !== null) {
+        if (phoneVibrateMode || gamepadIndex !== null) {
             // 立即触发震动
-            triggerVibration(currentLocalValues.left, currentLocalValues.right);
+            if (phoneVibrateMode) {
+                triggerPhoneVibration(currentLocalValues.left, currentLocalValues.right);
+            } else {
+                triggerVibration(currentLocalValues.left, currentLocalValues.right);
+            }
             
             // 如果不是持续震动模式，启动持续震动
             if (!localVibrationInterval && !localElasticMode) {
@@ -204,7 +250,9 @@ function initLocalControl() {
             currentLocalValues.left = 0;
             
             if (currentLocalValues.right === 0) {
-                stopVibration();
+                phoneVibrateMode ? stopPhoneVibration() : stopVibration();
+            } else if (phoneVibrateMode) {
+                triggerPhoneVibration(0, currentLocalValues.right);
             } else {
                 triggerVibration(0, currentLocalValues.right);
             }
@@ -220,7 +268,9 @@ function initLocalControl() {
             currentLocalValues.right = 0;
             
             if (currentLocalValues.left === 0) {
-                stopVibration();
+                phoneVibrateMode ? stopPhoneVibration() : stopVibration();
+            } else if (phoneVibrateMode) {
+                triggerPhoneVibration(currentLocalValues.left, 0);
             } else {
                 triggerVibration(currentLocalValues.left, 0);
             }
@@ -241,7 +291,11 @@ function initLocalControl() {
             startLocalVibration();
         }
         
-        triggerVibration(1, 1);
+        if (phoneVibrateMode) {
+            triggerPhoneVibration(1, 1);
+        } else {
+            triggerVibration(1, 1);
+        }
         addLog('本地触发：一键最大震动');
     });
 
@@ -254,7 +308,7 @@ function initLocalControl() {
         currentLocalValues.right = 0;
         
         stopLocalVibration();
-        stopVibration();
+        phoneVibrateMode ? stopPhoneVibration() : stopVibration();
         addLog('本地震动已停止');
     });
 
@@ -606,7 +660,9 @@ function initRemoteControl() {
 
 // 接收远程指令
 socket.on('triggerVibrate', ({ strong, weak }) => {
-    if (gamepadIndex !== null) {
+    if (phoneVibrateMode) {
+        triggerPhoneVibration(strong, weak);
+    } else if (gamepadIndex !== null) {
         const gp = navigator.getGamepads()[gamepadIndex];
         if (gp && gp.vibrationActuator) {
             // 增加duration确保持续感
