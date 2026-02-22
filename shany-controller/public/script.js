@@ -5,6 +5,7 @@ let isHost = false;
 let localElasticMode = false;
 let remoteElasticMode = false;
 let phoneVibrateMode = false;
+let remotePhoneVibrateMode = false;
 
 // 震动循环相关
 let localVibrationInterval = null;
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRoomClosePanel();
     initRoomToggle();
     initVibrateTargetToggle();
+    initRemoteVibrateTargetToggle();
     initLocalControl();
     initRemoteControl();
 });
@@ -103,6 +105,18 @@ function initVibrateTargetToggle() {
         } else {
             stopPhoneVibration();
         }
+    });
+}
+
+// === 远程震动目标切换 ===
+function initRemoteVibrateTargetToggle() {
+    const toggle = document.getElementById('remote-vibrate-target-mode');
+    const hint = document.getElementById('remote-vibrate-target-hint');
+
+    toggle.addEventListener('change', (e) => {
+        remotePhoneVibrateMode = e.target.checked;
+        hint.textContent = remotePhoneVibrateMode ? '当前：对方手机震动' : '当前：对方手柄震动';
+        addLog(remotePhoneVibrateMode ? '已切换为对方手机震动模式' : '已切换为对方手柄震动模式');
     });
 }
 
@@ -506,7 +520,8 @@ function initRemoteControl() {
             socket.emit('remoteVibrate', {
                 roomName: currentRoomName,
                 strong: currentRemoteValues.left,
-                weak: currentRemoteValues.right
+                weak: currentRemoteValues.right,
+                phoneVibrate: remotePhoneVibrateMode
             });
         }
     };
@@ -589,7 +604,8 @@ function initRemoteControl() {
             socket.emit('remoteVibrate', {
                 roomName: currentRoomName,
                 strong: 0,
-                weak: currentRemoteValues.right
+                weak: currentRemoteValues.right,
+                phoneVibrate: remotePhoneVibrateMode
             });
             
             addLog('远程左马达已回弹停止');
@@ -606,7 +622,8 @@ function initRemoteControl() {
             socket.emit('remoteVibrate', {
                 roomName: currentRoomName,
                 strong: currentRemoteValues.left,
-                weak: 0
+                weak: 0,
+                phoneVibrate: remotePhoneVibrateMode
             });
             
             addLog('远程右马达已回弹停止');
@@ -629,7 +646,8 @@ function initRemoteControl() {
             socket.emit('remoteVibrate', {
                 roomName: currentRoomName,
                 strong: 1,
-                weak: 1
+                weak: 1,
+                phoneVibrate: remotePhoneVibrateMode
             });
             addLog('远程触发：一键最大震动');
         }
@@ -648,7 +666,8 @@ function initRemoteControl() {
             socket.emit('remoteVibrate', {
                 roomName: currentRoomName,
                 strong: 0,
-                weak: 0
+                weak: 0,
+                phoneVibrate: remotePhoneVibrateMode
             });
             addLog('远程震动已停止');
         }
@@ -659,8 +678,9 @@ function initRemoteControl() {
 }
 
 // 接收远程指令
-socket.on('triggerVibrate', ({ strong, weak }) => {
-    if (phoneVibrateMode) {
+socket.on('triggerVibrate', ({ strong, weak, phoneVibrate }) => {
+    const usePhoneVibrate = phoneVibrate !== undefined ? phoneVibrate : phoneVibrateMode;
+    if (usePhoneVibrate) {
         triggerPhoneVibration(strong, weak);
     } else if (gamepadIndex !== null) {
         const gp = navigator.getGamepads()[gamepadIndex];
